@@ -5,10 +5,27 @@ from datetime import datetime, timedelta
 import os
 from bson.objectid import ObjectId
 import json
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-change-this'
+
+# Flask Configuration from environment variables
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'dev-key-change-in-production')
 app.config['MONGO_URI'] = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/garage_focus')
+
+# Application configuration
+APP_CONFIG = {
+    'FLASK_HOST': os.environ.get('FLASK_HOST', '0.0.0.0'),
+    'FLASK_PORT': int(os.environ.get('FLASK_PORT', 8000)),
+    'FLASK_DEBUG': os.environ.get('FLASK_DEBUG', 'True').lower() == 'true',
+    'MIN_FOCUS_DURATION': int(os.environ.get('MIN_FOCUS_DURATION', 5)),
+    'TOTAL_MINUTES_FOR_100_PERCENT': int(os.environ.get('TOTAL_MINUTES_FOR_100_PERCENT', 300)),
+    'SCRAP_METAL_PER_MINUTE': int(os.environ.get('SCRAP_METAL_PER_MINUTE', 1)),
+    'GRACE_PERIOD': int(os.environ.get('GRACE_PERIOD', 10)),
+}
 
 mongo = PyMongo(app)
 
@@ -256,4 +273,8 @@ def heartbeat():
 if __name__ == '__main__':
     with app.app_context():
         init_car_templates()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(
+        debug=APP_CONFIG['FLASK_DEBUG'],
+        host=APP_CONFIG['FLASK_HOST'],
+        port=APP_CONFIG['FLASK_PORT']
+    )
