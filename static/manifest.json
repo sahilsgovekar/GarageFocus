@@ -1,0 +1,28 @@
+{
+  "name": "Garage Focus - Fix Cars, Fix Focus",
+  "short_name": "Garage Focus",
+  "description": "Gamified productivity app where you restore digital cars by maintaining focus",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1a1a1a",
+  "background_color": "#0d1117",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "games", "lifestyle"],
+  "lang": "en-US",
+  "dir": "ltr"
+}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Garage Focus{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[70vh]">
+    <div class="w-full max-w-sm bg-garage-dark border border-neon-cyan/30 rounded-lg p-6 garage-glow">
+        <div class="text-center mb-6">
+            <div class="text-6xl mb-4">🎓</div>
+            <h2 class="text-2xl font-bold text-neon-amber font-racing mb-2">GET LICENSE</h2>
+            <p class="text-gray-400">Join the garage crew</p>
+        </div>
+
+        {% if error %}
+            <div class="bg-rust-red/20 border border-rust-red text-rust-red px-4 py-3 rounded mb-4">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="POST" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-300 mb-2">
+                    Choose Mechanic Name
+                </label>
+                <input type="text" id="username" name="username" required
+                       class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                              focus:border-neon-amber focus:ring-2 focus:ring-neon-amber/20 
+                              text-white placeholder-gray-400 transition-colors"
+                       placeholder="Pick a unique username"
+                       minlength="3" maxlength="20">
+                <p class="text-xs text-gray-500 mt-1">3-20 characters, letters and numbers only</p>
+            </div>
+            
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-300 mb-2">
+                    Create Garage Key
+                </label>
+                <input type="password" id="password" name="password" required
+                       class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                              focus:border-neon-amber focus:ring-2 focus:ring-neon-amber/20 
+                              text-white placeholder-gray-400 transition-colors"
+                       placeholder="Create a secure password"
+                       minlength="6">
+                <p class="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+            </div>
+
+            <div>
+                <label for="confirm_password" class="block text-sm font-medium text-gray-300 mb-2">
+                    Confirm Garage Key
+                </label>
+                <input type="password" id="confirm_password" name="confirm_password" required
+                       class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                              focus:border-neon-amber focus:ring-2 focus:ring-neon-amber/20 
+                              text-white placeholder-gray-400 transition-colors"
+                       placeholder="Confirm your password">
+            </div>
+
+            <button type="submit" 
+                    class="w-full bg-neon-amber hover:bg-amber-400 text-garage-darker 
+                           font-bold py-3 px-4 rounded-lg transition-colors neon-pulse">
+                🔑 GET GARAGE LICENSE
+            </button>
+        </form>
+
+        <div class="mt-6 text-center">
+            <p class="text-gray-400">
+                Already have a license? 
+                <a href="{{ url_for('login') }}" 
+                   class="text-neon-cyan hover:text-cyan-300 font-semibold">
+                    Enter Garage
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Welcome benefits -->
+    <div class="mt-8 w-full max-w-sm">
+        <div class="bg-gradient-to-r from-neon-amber/10 to-neon-cyan/10 border border-neon-amber/30 rounded-lg p-4">
+            <h3 class="font-bold text-neon-amber mb-3 text-center">🎁 STARTER PACK</h3>
+            <div class="space-y-2 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-300">First Car:</span>
+                    <span class="text-neon-cyan font-semibold">FREE Pick!</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-300">Starting Scrap:</span>
+                    <span class="text-neon-amber font-semibold">0 🔩</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-300">Tutorial:</span>
+                    <span class="text-engine-silver font-semibold">Included</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4 text-center text-xs text-gray-500">
+            By registering, you agree to focus hard and not drop the wrench! 🔧
+        </div>
+    </div>
+</div>
+
+<script>
+// Password confirmation validation
+document.addEventListener('DOMContentLoaded', function() {
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const form = document.querySelector('form');
+    
+    function validatePasswords() {
+        if (password.value !== confirmPassword.value) {
+            confirmPassword.setCustomValidity("Passwords don't match");
+        } else {
+            confirmPassword.setCustomValidity('');
+        }
+    }
+    
+    password.addEventListener('change', validatePasswords);
+    confirmPassword.addEventListener('keyup', validatePasswords);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if current_car %}My Garage - {{ current_car.template.name }}{% else %}My Garage{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if not current_car %}
+    <!-- No Current Car - Go to Junkyard -->
+    <div class="text-center py-12">
+        <div class="text-6xl mb-6">🏭</div>
+        <h2 class="text-2xl font-bold text-gray-400 mb-4">Your Garage is Empty</h2>
+        <p class="text-gray-500 mb-6">Time to find a project car!</p>
+        <a href="{{ url_for('junkyard') }}" 
+           class="bg-neon-cyan hover:bg-cyan-400 text-garage-darker font-bold py-3 px-6 rounded-lg inline-block neon-pulse">
+            🚗 Visit Junkyard
+        </a>
+    </div>
+    
+    <!-- Showroom (Completed Cars) -->
+    {% if completed_cars %}
+    <div class="mt-12">
+        <h3 class="text-xl font-bold text-neon-amber mb-4 text-center">🏆 SHOWROOM</h3>
+        <div class="space-y-3">
+            {% for car in completed_cars %}
+            <div class="bg-gradient-to-r from-neon-amber/10 to-neon-cyan/10 border border-neon-amber/50 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-bold text-neon-amber">{{ car.car_model.replace('_', ' ').title() }}</h4>
+                        <p class="text-xs text-gray-400">Completed {{ car.completed_at.strftime('%b %d') if car.completed_at else 'Recently' }}</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl mb-1">✨</div>
+                        <div class="text-xs text-engine-silver">{{ (car.total_focus_minutes / 60)|round(1) }}h</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+{% else %}
+    <!-- Current Car Display -->
+    <div class="text-center mb-6">
+        <h2 class="text-2xl font-bold text-neon-cyan font-racing">{{ current_car.template.name }}</h2>
+        <p class="text-gray-400">{{ current_car.car_model.replace('_', ' ').title() }}</p>
+    </div>
+
+    <!-- Car Visual -->
+    <div class="car-container mb-6">
+        <!-- Car stages based on progress -->
+        {% set progress = current_car.restoration_progress %}
+        {% set current_stage = 0 %}
+        {% for stage in current_car.template.stages %}
+            {% if progress >= stage.threshold %}
+                {% set current_stage = loop.index0 %}
+            {% endif %}
+        {% endfor %}
+        
+        <div class="relative bg-garage-dark border-2 border-gray-600 rounded-xl p-6">
+            <!-- Car Image Placeholder with Progress -->
+            <div class="w-full h-48 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden">
+                <!-- Background texture -->
+                <div class="absolute inset-0 opacity-20">
+                    <div class="w-full h-full" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><defs><pattern id=%22grain%22 width=%2250%22 height=%2250%22 patternUnits=%22userSpaceOnUse%22><circle cx=%2225%22 cy=%2225%22 r=%221%22 fill=%22%23333%22/></pattern></defs><rect width=%22100%22 height=%22100%22 fill=%22url(%23grain)%22/></svg>'); background-size: 20px 20px;"></div>
+                </div>
+                
+                <!-- Car representation -->
+                <div class="relative z-10">
+                    {% if progress == 0 %}
+                        <!-- Rusted junk -->
+                        <div class="text-6xl filter grayscale">🚗💨</div>
+                        <div class="smoke-effect active"></div>
+                    {% elif progress < 25 %}
+                        <!-- Getting started -->
+                        <div class="text-6xl">🔧🚗</div>
+                    {% elif progress < 50 %}
+                        <!-- Half restored -->
+                        <div class="text-6xl">🚙</div>
+                    {% elif progress < 75 %}
+                        <!-- Almost done -->
+                        <div class="text-6xl">🚗✨</div>
+                    {% elif progress < 100 %}
+                        <!-- Nearly complete -->
+                        <div class="text-6xl">✨🚗✨</div>
+                    {% else %}
+                        <!-- Showroom ready -->
+                        <div class="text-6xl neon-pulse">🏁🚗🏁</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="mt-4">
+                <div class="flex justify-between text-sm text-gray-400 mb-2">
+                    <span>Restoration Progress</span>
+                    <span>{{ "%.1f"|format(progress) }}%</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-3">
+                    <div class="bg-gradient-to-r from-rust-red via-neon-amber to-neon-cyan h-3 rounded-full transition-all duration-500"
+                         style="width: {{ progress }}%"></div>
+                </div>
+                {% if progress < 100 %}
+                    <div class="text-xs text-gray-500 mt-1 text-center">
+                        Next milestone: {{ current_car.template.stages[current_stage + 1].description if current_stage + 1 < current_car.template.stages|length else 'Showroom Ready!' }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="bg-garage-dark border border-gray-600 rounded-lg p-4 text-center">
+            <div class="text-2xl text-neon-amber mb-2">⏱️</div>
+            <div class="text-lg font-bold text-white">{{ (current_car.total_focus_minutes / 60)|round(1) }}</div>
+            <div class="text-xs text-gray-400">Hours Focused</div>
+        </div>
+        <div class="bg-garage-dark border border-gray-600 rounded-lg p-4 text-center">
+            <div class="text-2xl text-neon-cyan mb-2">🔩</div>
+            <div class="text-lg font-bold text-white">{{ user.scrap_metal }}</div>
+            <div class="text-xs text-gray-400">Scrap Metal</div>
+        </div>
+    </div>
+
+    <!-- Focus Session Setup -->
+    <div class="bg-garage-dark border border-neon-cyan/30 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-bold text-neon-cyan mb-4 text-center">🔧 START WORKING</h3>
+        
+        <form id="session-form" class="space-y-4">
+            <div>
+                <label for="task-input" class="block text-sm font-medium text-gray-300 mb-2">
+                    What are you working on?
+                </label>
+                <input type="text" id="task-input" 
+                       class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                              focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 
+                              text-white placeholder-gray-400"
+                       placeholder="e.g., Study calculus, Read chapter 5..."
+                       required>
+            </div>
+            
+            <div>
+                <label for="duration-select" class="block text-sm font-medium text-gray-300 mb-2">
+                    Session Duration
+                </label>
+                <select id="duration-select" 
+                        class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                               focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 text-white">
+                    <option value="5">5 minutes - Quick check</option>
+                    <option value="10">10 minutes - Mini session</option>
+                    <option value="15">15 minutes - Quick tune-up</option>
+                    <option value="25" selected>25 minutes - Standard session</option>
+                    <option value="45">45 minutes - Deep work</option>
+                    <option value="60">60 minutes - Marathon</option>
+                </select>
+            </div>
+            
+            <div class="bg-neon-amber/10 border border-neon-amber/30 rounded p-3 text-sm">
+                <p class="text-neon-amber font-semibold mb-1">⚠️ Focus Rules:</p>
+                <ul class="text-gray-300 text-xs space-y-1">
+                    <li>• Stay on this tab during the session</li>
+                    <li>• Switch tabs = 10 second warning</li>
+                    <li>• Don't return in time = session fails!</li>
+                    <li>• Complete session = earn scrap metal + progress</li>
+                </ul>
+            </div>
+        </form>
+    </div>
+
+    <!-- Completed Car Success -->
+    {% if progress >= 100 %}
+    <div class="bg-gradient-to-r from-neon-amber/20 to-neon-cyan/20 border-2 border-neon-amber rounded-lg p-6 text-center mb-6">
+        <div class="text-4xl mb-3">🎉</div>
+        <h3 class="text-xl font-bold text-neon-amber mb-2">RESTORATION COMPLETE!</h3>
+        <p class="text-gray-300 mb-4">{{ current_car.template.name }} is showroom ready!</p>
+        <a href="{{ url_for('junkyard') }}" 
+           class="bg-neon-cyan hover:bg-cyan-400 text-garage-darker font-bold py-2 px-6 rounded-lg inline-block">
+            🚗 Find Next Project
+        </a>
+    </div>
+    {% endif %}
+
+{% endif %}
+
+<!-- Floating Action Button -->
+{% if current_car and current_car.restoration_progress < 100 %}
+<button id="start-focus-btn" 
+        class="floating-button bg-neon-cyan hover:bg-cyan-400 text-garage-darker 
+               font-bold py-4 px-8 rounded-full shadow-lg neon-pulse">
+    🔧 START ENGINE
+</button>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startBtn = document.getElementById('start-focus-btn');
+    const sessionForm = document.getElementById('session-form');
+    const taskInput = document.getElementById('task-input');
+    const durationSelect = document.getElementById('duration-select');
+    
+    if (startBtn && sessionForm) {
+        startBtn.addEventListener('click', function() {
+            const task = taskInput.value.trim();
+            const duration = parseInt(durationSelect.value);
+            
+            if (!task) {
+                alert('Please enter what you\'re working on!');
+                taskInput.focus();
+                return;
+            }
+            
+            // Start focus session
+            window.focusTimer.startSession(task, duration);
+        });
+        
+        // Allow Enter key to start session
+        taskInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                startBtn.click();
+            }
+        });
+    }
+});
+</script>
+
+{% endblock %}

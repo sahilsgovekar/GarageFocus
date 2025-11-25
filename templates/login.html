@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Garage Focus{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[70vh]">
+    <div class="w-full max-w-sm bg-garage-dark border border-neon-cyan/30 rounded-lg p-6 garage-glow">
+        <div class="text-center mb-6">
+            <div class="text-6xl mb-4">🏁</div>
+            <h2 class="text-2xl font-bold text-neon-cyan font-racing mb-2">ENTER GARAGE</h2>
+            <p class="text-gray-400">Don't let your engine stall</p>
+        </div>
+
+        {% if error %}
+            <div class="bg-rust-red/20 border border-rust-red text-rust-red px-4 py-3 rounded mb-4">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form method="POST" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-300 mb-2">
+                    Mechanic Name
+                </label>
+                <input type="text" id="username" name="username" required
+                       class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                              focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 
+                              text-white placeholder-gray-400 transition-colors"
+                       placeholder="Enter your username">
+            </div>
+            
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-300 mb-2">
+                    Garage Key
+                </label>
+                <input type="password" id="password" name="password" required
+                       class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                              focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 
+                              text-white placeholder-gray-400 transition-colors"
+                       placeholder="Enter your password">
+            </div>
+
+            <button type="submit" 
+                    class="w-full bg-neon-cyan hover:bg-cyan-400 text-garage-darker 
+                           font-bold py-3 px-4 rounded-lg transition-colors neon-pulse">
+                🔧 START ENGINE
+            </button>
+        </form>
+
+        <div class="mt-6 text-center">
+            <p class="text-gray-400">
+                New to the garage? 
+                <a href="{{ url_for('register') }}" 
+                   class="text-neon-amber hover:text-amber-300 font-semibold">
+                    Get Your License
+                </a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Feature highlights -->
+    <div class="mt-8 grid grid-cols-1 gap-4 w-full max-w-sm text-center">
+        <div class="bg-garage-dark/50 border border-gray-700 rounded-lg p-4">
+            <div class="text-2xl mb-2">🚗</div>
+            <h3 class="font-semibold text-neon-cyan">Restore Classic Cars</h3>
+            <p class="text-xs text-gray-400">Transform rust buckets into showroom beauties</p>
+        </div>
+        
+        <div class="bg-garage-dark/50 border border-gray-700 rounded-lg p-4">
+            <div class="text-2xl mb-2">⏰</div>
+            <h3 class="font-semibold text-neon-cyan">Focus Sessions</h3>
+            <p class="text-xs text-gray-400">Stay focused or drop the wrench!</p>
+        </div>
+        
+        <div class="bg-garage-dark/50 border border-gray-700 rounded-lg p-4">
+            <div class="text-2xl mb-2">🔩</div>
+            <h3 class="font-semibold text-neon-cyan">Earn Scrap Metal</h3>
+            <p class="text-xs text-gray-400">Currency for upgrades and customization</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

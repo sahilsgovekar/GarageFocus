@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Junkyard - Select Your Project{% endblock %}
+
+{% block content %}
+<div class="text-center mb-6">
+    <div class="text-6xl mb-4">🏚️</div>
+    <h2 class="text-3xl font-bold text-rust-red font-racing mb-2">THE JUNKYARD</h2>
+    <p class="text-gray-400">Pick your project car and start restoring!</p>
+</div>
+
+<!-- Car Selection Grid -->
+<div class="space-y-6">
+    {% for car in car_templates %}
+    <div class="bg-garage-dark border-2 border-gray-600 rounded-lg p-4 car-option hover:border-neon-cyan transition-colors"
+         data-car-model="{{ car.model_id }}">
+        <div class="flex items-center space-x-4">
+            <!-- Car Image Placeholder -->
+            <div class="w-24 h-16 bg-rust-red/20 rounded border-2 border-rust-red flex items-center justify-center">
+                <span class="text-2xl">🚗</span>
+            </div>
+            
+            <!-- Car Info -->
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-neon-cyan">{{ car.name }}</h3>
+                <p class="text-sm text-gray-400">Classic {{ car.model_id.replace('_', ' ').title() }}</p>
+                <div class="flex items-center space-x-4 mt-2 text-xs">
+                    <span class="text-neon-amber">
+                        ⏱️ {{ (car.total_focus_minutes_required / 60)|round(1) }}h to restore
+                    </span>
+                    <span class="text-engine-silver">
+                        🏆 {{ car.stages|length }} stages
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Select Button -->
+            <button class="select-car-btn bg-neon-cyan hover:bg-cyan-400 text-garage-darker 
+                           font-bold py-2 px-4 rounded transition-colors"
+                    data-car-model="{{ car.model_id }}"
+                    data-car-name="{{ car.name }}">
+                SELECT
+            </button>
+        </div>
+        
+        <!-- Car Details (Expandable) -->
+        <div class="mt-4 pt-4 border-t border-gray-600 text-xs text-gray-400">
+            <p><strong>Restoration Journey:</strong></p>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                {% for stage in car.stages %}
+                <div class="flex items-center space-x-2">
+                    <span class="w-2 h-2 bg-gray-600 rounded-full"></span>
+                    <span>{{ stage.threshold }}%: {{ stage.description }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- No cars fallback -->
+{% if not car_templates %}
+<div class="text-center py-12">
+    <div class="text-4xl mb-4">😅</div>
+    <h3 class="text-xl font-bold text-gray-400 mb-2">Junkyard is Empty!</h3>
+    <p class="text-gray-500">No cars available right now. Check back later!</p>
+</div>
+{% endif %}
+
+<!-- Instructions -->
+<div class="mt-8 bg-garage-dark/50 border border-gray-700 rounded-lg p-4">
+    <h3 class="font-bold text-neon-amber mb-2">🔧 HOW IT WORKS</h3>
+    <ul class="text-sm text-gray-300 space-y-1">
+        <li>• Choose a project car from the junkyard</li>
+        <li>• Complete focus sessions to restore parts</li>
+        <li>• Stay focused or you'll drop the wrench!</li>
+        <li>• Watch your rust bucket become a showroom beauty</li>
+        <li>• Collect completed cars in your garage</li>
+    </ul>
+</div>
+
+<!-- Selection Confirmation Modal -->
+<div id="confirm-modal" class="fixed inset-0 bg-garage-darker/90 flex items-center justify-center z-50 hidden">
+    <div class="bg-garage-dark border border-neon-cyan rounded-lg p-6 m-4 max-w-sm w-full">
+        <div class="text-center">
+            <div class="text-4xl mb-4">🚗</div>
+            <h3 class="text-xl font-bold text-neon-cyan mb-2">Confirm Selection</h3>
+            <p class="text-gray-400 mb-4">
+                Ready to start working on <span id="selected-car-name" class="text-neon-amber font-semibold"></span>?
+            </p>
+            <div class="flex space-x-3">
+                <button id="cancel-selection" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded">
+                    Cancel
+                </button>
+                <button id="confirm-selection" class="flex-1 bg-neon-cyan hover:bg-cyan-400 text-garage-darker font-bold py-2 px-4 rounded">
+                    Let's Go!
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="fixed inset-0 bg-garage-darker/95 flex items-center justify-center z-50 hidden">
+    <div class="text-center">
+        <div class="text-6xl mb-4">🔧</div>
+        <h3 class="text-xl font-bold text-neon-cyan mb-2">Setting up your garage...</h3>
+        <div class="text-gray-400">Moving car to your workspace</div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectButtons = document.querySelectorAll('.select-car-btn');
+    const confirmModal = document.getElementById('confirm-modal');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const selectedCarName = document.getElementById('selected-car-name');
+    const cancelBtn = document.getElementById('cancel-selection');
+    const confirmBtn = document.getElementById('confirm-selection');
+    
+    let selectedCarModel = null;
+    
+    // Handle car selection
+    selectButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            selectedCarModel = this.dataset.carModel;
+            selectedCarName.textContent = this.dataset.carName;
+            confirmModal.classList.remove('hidden');
+        });
+    });
+    
+    // Handle cancel
+    cancelBtn.addEventListener('click', function() {
+        confirmModal.classList.add('hidden');
+        selectedCarModel = null;
+    });
+    
+    // Handle confirmation
+    confirmBtn.addEventListener('click', function() {
+        if (!selectedCarModel) return;
+        
+        confirmModal.classList.add('hidden');
+        loadingOverlay.classList.remove('hidden');
+        
+        // Send selection to backend
+        fetch('/api/select_car', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ car_model: selectedCarModel })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Redirect to garage
+                window.location.href = '/';
+            } else {
+                alert('Error selecting car: ' + (data.error || 'Unknown error'));
+                loadingOverlay.classList.add('hidden');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Network error. Please try again.');
+            loadingOverlay.classList.add('hidden');
+        });
+    });
+    
+    // Close modal on outside click
+    confirmModal.addEventListener('click', function(e) {
+        if (e.target === confirmModal) {
+            confirmModal.classList.add('hidden');
+            selectedCarModel = null;
+        }
+    });
+});
+</script>
+{% endblock %}

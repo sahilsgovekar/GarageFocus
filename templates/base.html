@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Garage Focus - Fix Cars, Fix Focus{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'garage-dark': '#1a1a1a',
+                        'garage-darker': '#0d1117',
+                        'neon-cyan': '#00d9ff',
+                        'neon-amber': '#ffb000',
+                        'rust-red': '#b7410e',
+                        'engine-silver': '#c0c0c0'
+                    },
+                    fontFamily: {
+                        'racing': ['Orbitron', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1a1a1a">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    
+    <style>
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(135deg, #0d1117 0%, #1a1a1a 100%);
+            min-height: 100vh;
+        }
+        
+        .garage-glow {
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+        }
+        
+        .car-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .car-stage {
+            width: 100%;
+            height: auto;
+            transition: all 0.5s ease-in-out;
+        }
+        
+        .speedometer {
+            background: conic-gradient(from 0deg, #b7410e 0%, #ffb000 50%, #00d9ff 100%);
+            border-radius: 50%;
+            position: relative;
+        }
+        
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .floating-button {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
+        }
+        
+        @keyframes pulse-neon {
+            0%, 100% { 
+                box-shadow: 0 0 5px #00d9ff, 0 0 10px #00d9ff, 0 0 15px #00d9ff;
+            }
+            50% { 
+                box-shadow: 0 0 10px #00d9ff, 0 0 20px #00d9ff, 0 0 30px #00d9ff;
+            }
+        }
+        
+        .neon-pulse {
+            animation: pulse-neon 2s infinite;
+        }
+        
+        .smoke-effect {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(0,0,0,0.7) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        .smoke-effect.active {
+            opacity: 1;
+        }
+
+        .timer-display {
+            font-size: 3rem;
+            font-weight: 900;
+            text-shadow: 0 0 10px currentColor;
+        }
+    </style>
+</head>
+<body class="bg-garage-darker text-white">
+    <nav class="bg-garage-dark border-b border-neon-cyan/30 px-4 py-3">
+        <div class="flex justify-between items-center max-w-md mx-auto">
+            <h1 class="text-xl font-bold text-neon-cyan font-racing">🏁 GARAGE FOCUS</h1>
+            {% if session.user_id %}
+                <div class="flex items-center space-x-4">
+                    <span class="text-neon-amber font-bold">🔩 {{ user.scrap_metal if user else 0 }}</span>
+                    <a href="/logout" class="text-rust-red hover:text-red-400">Logout</a>
+                </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-6 max-w-md">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="bg-neon-amber/20 border border-neon-amber text-neon-amber px-4 py-3 rounded mb-4">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Focus Timer Overlay -->
+    <div id="focus-overlay" class="fixed inset-0 bg-garage-darker/95 flex flex-col items-center justify-center z-50 hidden">
+        <div class="text-center p-8">
+            <h2 class="text-3xl font-bold text-neon-cyan mb-4 font-racing">FOCUS MODE</h2>
+            <div class="relative w-40 h-40 mx-auto mb-6">
+                <svg class="w-full h-full progress-ring">
+                    <circle cx="80" cy="80" r="70" stroke="#333" stroke-width="8" fill="transparent"/>
+                    <circle id="progress-circle" cx="80" cy="80" r="70" stroke="#00d9ff" stroke-width="8" 
+                            fill="transparent" stroke-dasharray="439.8" stroke-dashoffset="439.8"/>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <div id="timer-display" class="timer-display text-neon-cyan">25:00</div>
+                </div>
+            </div>
+            <p id="session-task" class="text-lg text-gray-300 mb-4">Working on: Study Session</p>
+            <div id="tab-warning" class="hidden bg-rust-red/20 border border-rust-red text-rust-red px-4 py-3 rounded mb-4">
+                ⚠️ Hey! Get back to the garage! Engine will stall in <span id="warning-countdown">10</span> seconds!
+            </div>
+            <button id="stop-session" class="bg-rust-red hover:bg-red-700 px-6 py-3 rounded font-bold">
+                Stop Session
+            </button>
+        </div>
+    </div>
+
+    <!-- Focus Timer JavaScript -->
+    <script>
+        class FocusTimer {
+            constructor() {
+                this.isActive = false;
+                this.startTime = null;
+                this.duration = 0; // in minutes
+                this.warningTimeout = null;
+                this.failTimeout = null;
+                this.heartbeatInterval = null;
+                this.timerInterval = null;
+                this.tabSwitchTime = null;
+                
+                this.initEventListeners();
+            }
+            
+            initEventListeners() {
+                // Page visibility API
+                document.addEventListener("visibilitychange", () => {
+                    if (this.isActive) {
+                        if (document.visibilityState === 'hidden') {
+                            this.handleTabSwitch();
+                        } else if (document.visibilityState === 'visible') {
+                            this.handleTabReturn();
+                        }
+                    }
+                });
+                
+                // Stop session button
+                document.getElementById('stop-session').addEventListener('click', () => {
+                    this.stopSession(false);
+                });
+            }
+            
+            startSession(taskName, durationMinutes) {
+                this.isActive = true;
+                this.startTime = new Date();
+                this.duration = durationMinutes;
+                
+                // Show overlay
+                document.getElementById('focus-overlay').classList.remove('hidden');
+                document.getElementById('session-task').textContent = `Working on: ${taskName}`;
+                
+                // Start timer display
+                this.updateTimerDisplay();
+                this.timerInterval = setInterval(() => this.updateTimerDisplay(), 1000);
+                
+                // Start heartbeat
+                this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 60000); // Every minute
+                
+                // Send start session to backend
+                fetch('/api/start_session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        duration: durationMinutes, 
+                        task: taskName 
+                    })
+                });
+            }
+            
+            updateTimerDisplay() {
+                const elapsed = (new Date() - this.startTime) / 1000 / 60; // minutes
+                const remaining = Math.max(0, this.duration - elapsed);
+                
+                if (remaining <= 0) {
+                    this.stopSession(true);
+                    return;
+                }
+                
+                const minutes = Math.floor(remaining);
+                const seconds = Math.floor((remaining - minutes) * 60);
+                
+                document.getElementById('timer-display').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                // Update progress ring
+                const progress = elapsed / this.duration;
+                const circumference = 439.8;
+                const offset = circumference * (1 - progress);
+                document.getElementById('progress-circle').style.strokeDashoffset = offset;
+            }
+            
+            handleTabSwitch() {
+                if (!this.isActive) return;
+                
+                this.tabSwitchTime = new Date();
+                document.getElementById('tab-warning').classList.remove('hidden');
+                
+                let countdown = 10;
+                this.warningTimeout = setInterval(() => {
+                    countdown--;
+                    document.getElementById('warning-countdown').textContent = countdown;
+                    
+                    if (countdown <= 0) {
+                        this.failSession();
+                    }
+                }, 1000);
+            }
+            
+            handleTabReturn() {
+                if (!this.isActive || !this.tabSwitchTime) return;
+                
+                const awayTime = (new Date() - this.tabSwitchTime) / 1000;
+                
+                if (awayTime < 10) {
+                    // Safe return
+                    document.getElementById('tab-warning').classList.add('hidden');
+                    if (this.warningTimeout) {
+                        clearInterval(this.warningTimeout);
+                        this.warningTimeout = null;
+                    }
+                } else {
+                    // Too late, session failed
+                    this.failSession();
+                }
+                
+                this.tabSwitchTime = null;
+            }
+            
+            failSession() {
+                this.stopSession(false);
+                alert("Session failed! You dropped the wrench! 🔧💥");
+            }
+            
+            stopSession(success) {
+                if (!this.isActive) return;
+                
+                this.isActive = false;
+                const elapsedMinutes = (new Date() - this.startTime) / 1000 / 60;
+                
+                // Clear intervals
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                if (this.warningTimeout) clearInterval(this.warningTimeout);
+                if (this.failTimeout) clearTimeout(this.failTimeout);
+                
+                // Hide overlay
+                document.getElementById('focus-overlay').classList.add('hidden');
+                document.getElementById('tab-warning').classList.add('hidden');
+                
+                // Send completion to backend
+                fetch('/api/complete_session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        minutes_focused: elapsedMinutes,
+                        success: success
+                    })
+                }).then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload(); // Refresh to show updated car state
+                    } else {
+                        alert(data.message || 'Session completed');
+                        location.reload();
+                    }
+                });
+            }
+            
+            sendHeartbeat() {
+                if (!this.isActive) return;
+                
+                fetch('/api/heartbeat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+        }
+        
+        // Initialize timer
+        const focusTimer = new FocusTimer();
+        
+        // Make it globally available
+        window.focusTimer = focusTimer;
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
