@@ -49,6 +49,7 @@ Garage Focus is a full-stack web application built with Flask (Python) backend a
 #### 3. `car_templates`
 ```json
 {
+  "_id": ObjectId,
   "model_id": String (unique),
   "name": String,
   "total_focus_minutes_required": Number,
@@ -56,11 +57,21 @@ Garage Focus is a full-stack web application built with Flask (Python) backend a
     {
       "threshold": Number (0-100),
       "image_url": String,
+      "model_3d_url": String,
       "description": String
     }
-  ]
+  ],
+  "created_at": DateTime,
+  "created_by": String (admin_username)
 }
 ```
+
+#### 4. `uploaded_assets` (Implicit - Files on disk)
+Asset files are stored in the filesystem at:
+- `static/assets/uploads/2d/` - 2D images (PNG, JPG, GIF)
+- `static/assets/uploads/3d/` - 3D models (GLB, GLTF, FBX, OBJ)
+
+File naming convention: `{uuid}_{original_name}.{extension}`
 
 ---
 
@@ -402,4 +413,380 @@ Users can install the app on mobile devices:
 
 ---
 
-This technical documentation provides a complete overview of how Garage Focus works under the hood, from user interactions to database updates.
+## 3D System Architecture
+
+### Three.js Integration
+The application includes a comprehensive 3D car viewing system using Three.js r128.
+
+**Dependencies**:
+- Three.js core library
+- OrbitControls for camera interaction
+- GLTFLoader for 3D model loading
+
+**JavaScript Class**: `Car3DViewer` (located in `static/js/car-viewer-3d.js`)
+
+### 3D Car Viewer Class
+
+**Constructor Options**:
+```javascript
+new Car3DViewer('container-id', {
+  width: 800,              // Viewer width
+  height: 400,             // Viewer height
+  enableControls: true,    // Enable mouse/touch controls
+  autoRotate: false,       // Auto-rotate the model
+  fallbackMode: 'image'    // Fallback when 3D unavailable
+});
+```
+
+**Key Methods**:
+- `loadCarModel(modelUrl, progress)`: Loads GLB/GLTF/FBX/OBJ models
+- `updateProgress(progress)`: Updates car appearance based on restoration progress
+- `enableFallback()`: Switches to emoji-based 2D visualization
+- `applyProgressionEffects(progress)`: Applies rust-to-shine material changes
+- `destroy()`: Cleans up Three.js resources
+
+### 3D Model Loading Process
+
+1. **API Request**: Fetch `/api/car_3d/{model_id}?progress={progress}`
+2. **Response Processing**: Parse JSON response with model URLs
+3. **File Loading**: Download and parse 3D model file
+4. **Scene Setup**: Position, scale, and light the model
+5. **Material Effects**: Apply progression-based visual changes
+6. **Render Loop**: Continuous animation and user interaction
+
+### Fallback System
+
+**Triggers for Fallback Mode**:
+- Three.js library not available
+- No 3D model URL provided
+- 3D model loading timeout (3 seconds)
+- 3D model loading error
+
+**Fallback Display**:
+- Progress-based emoji cars (🚗💨 → 🔧🚗 → 🚙 → 🚗✨ → 🏁🚗🏁)
+- Animated visual feedback
+- User-friendly messaging
+
+### 3D API Endpoint
+
+#### Get 3D Model Data
+**Endpoint**: `GET /api/car_3d/<model_id>`
+**Parameters**: `?progress={progress_value}`
+
+**Response**:
+```json
+{
+  "model_3d_url": "/static/assets/uploads/3d/uuid_model.glb",
+  "image_url": "/static/assets/uploads/2d/uuid_image.png",
+  "description": "Half Restored",
+  "progress": 50.0,
+  "stage_threshold": 50
+}
+```
+
+**Backend Logic**:
+- Finds car template by model_id
+- Determines current stage based on progress
+- Returns appropriate asset URLs for that stage
+
+---
+
+## Admin Dashboard System
+
+### Admin Authentication
+
+#### Admin Session Management
+- **Session Keys**: `is_admin=True`, `admin_user=username`
+- **Authentication**: Separate from user authentication
+- **Access Control**: All admin routes check `is_admin()` function
+
+#### Default Credentials
+- **Username**: `admin` (configurable via `ADMIN_USERNAME` env var)
+- **Password**: `garage123` (configurable via `ADMIN_PASSWORD` env var)
+
+### Admin Routes
+
+#### Dashboard Routes
+- `GET /admin/login` - Admin login page
+- `POST /admin/login` - Process admin login
+- `GET /admin/logout` - Admin logout
+- `GET /admin` - Main admin dashboard
+- `GET /admin/cars` - Car template management
+- `GET /admin/cars/new` - Create new car form
+- `POST /admin/cars/new` - Process new car creation
+- `GET /admin/cars/<id>/edit` - Edit car template
+- `POST /admin/cars/<id>/delete` - Delete car template
+- `GET /admin/upload` - Asset upload interface
+- `POST /admin/upload` - Process file upload
+
+#### Admin API Routes
+- `POST /api/admin/update_car_stage` - Update car stage assets
+
+### Car Template Management
+
+#### Creating New Car Templates
+**Frontend Flow**:
+1. Admin fills form with model_id, name, focus_time_required
+2. System validates unique model_id
+3. Creates car_template with 5 default stages
+4. Redirects to edit page for asset upload
+
+**Backend Logic**:
+```python
+new_car = {
+    'model_id': 'ferrari_f40',
+    'name': 'The Beast',
+    'total_focus_minutes_required': 500,
+    'stages': [
+        {"threshold": 0, "image_url": "", "model_3d_url": "", "description": "Rusted Junk"},
+        {"threshold": 25, "image_url": "", "model_3d_url": "", "description": "Getting Started"},
+        {"threshold": 50, "image_url": "", "model_3d_url": "", "description": "Half Restored"},
+        {"threshold": 75, "image_url": "", "model_3d_url": "", "description": "Almost Done"},
+        {"threshold": 100, "image_url": "", "model_3d_url": "", "description": "Showroom Ready"}
+    ],
+    'created_at': datetime.utcnow(),
+    'created_by': session['admin_user']
+}
+```
+
+---
+
+## Asset Upload System
+
+### File Upload Configuration
+- **Max File Size**: 16MB
+- **Upload Directory**: `static/assets/uploads/`
+- **2D Images**: `static/assets/uploads/2d/`
+- **3D Models**: `static/assets/uploads/3d/`
+
+### Supported File Formats
+
+#### 2D Images
+- **Formats**: PNG, JPG, JPEG, GIF
+- **Use Case**: Fallback visuals, thumbnails, previews
+- **Recommended**: PNG (transparency), 512x512px to 1024x1024px
+
+#### 3D Models
+- **GLB** (preferred): Binary GLTF, compact, includes textures
+- **GLTF**: JSON GLTF, human-readable, multiple files
+- **FBX**: Autodesk format, widely supported
+- **OBJ**: Wavefront format, basic geometry only
+
+### File Upload Process
+
+#### Frontend Upload Flow
+1. Admin selects file via drag-drop or file picker
+2. Form validates file type and size
+3. Auto-detects asset type (2D vs 3D) from extension
+4. Optional: Assigns to specific car and stage
+5. Uploads with unique filename generation
+
+#### Backend Processing
+```python
+# Generate unique filename
+filename = secure_filename(file.filename)
+unique_filename = f"{uuid.uuid4()}_{filename}"
+
+# Determine upload path
+if asset_type == '3d':
+    upload_path = os.path.join(app.config['UPLOAD_FOLDER'], '3d')
+else:
+    upload_path = os.path.join(app.config['UPLOAD_FOLDER'], '2d')
+
+# Save file
+file.save(os.path.join(upload_path, unique_filename))
+
+# Update database if assigned to car
+if car_id and stage_threshold:
+    update_field = 'model_3d_url' if asset_type == '3d' else 'image_url'
+    file_url = f"/static/assets/uploads/{asset_type}/{unique_filename}"
+    
+    # Update specific stage in car template
+    mongo.db.car_templates.update_one(
+        {'_id': ObjectId(car_id), 'stages.threshold': stage_threshold},
+        {'$set': {f'stages.$.{update_field}': file_url}}
+    )
+```
+
+### Asset Management
+
+#### Database Integration
+Assets are linked to car templates via URLs in the `stages` array:
+```json
+{
+  "threshold": 50,
+  "image_url": "/static/assets/uploads/2d/abc123_mustang_50.png",
+  "model_3d_url": "/static/assets/uploads/3d/def456_mustang_50.glb",
+  "description": "Half Restored"
+}
+```
+
+#### Admin Asset Interface
+- **Visual indicators**: Shows which stages have assets (🖼️ = 2D, 📦 = 3D, ❌ = Missing)
+- **Preview functionality**: 2D images show thumbnails, 3D shows file info
+- **Remove assets**: Delete files and update database
+- **Replace assets**: Upload new versions
+
+---
+
+## Environment Configuration
+
+### New Environment Variables (.env)
+
+```bash
+# Flask Configuration
+FLASK_SECRET_KEY=your-super-secret-key-change-in-production
+FLASK_HOST=0.0.0.0
+FLASK_PORT=8000
+FLASK_DEBUG=True
+
+# MongoDB Connection
+MONGO_URI=mongodb://localhost:27017/garage_focus
+
+# Admin Credentials
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=garage123
+
+# Game Configuration
+MIN_FOCUS_DURATION=5                     # Minimum minutes for progress
+TOTAL_MINUTES_FOR_100_PERCENT=300       # Minutes required for 100% completion
+SCRAP_METAL_PER_MINUTE=1                # Currency earned per minute
+GRACE_PERIOD=10                         # Seconds allowed when switching tabs
+```
+
+### Configuration Loading
+```python
+# Load environment variables from .env file
+load_dotenv()
+
+APP_CONFIG = {
+    'FLASK_HOST': os.environ.get('FLASK_HOST', '0.0.0.0'),
+    'FLASK_PORT': int(os.environ.get('FLASK_PORT', 8000)),
+    'FLASK_DEBUG': os.environ.get('FLASK_DEBUG', 'True').lower() == 'true',
+    'MIN_FOCUS_DURATION': int(os.environ.get('MIN_FOCUS_DURATION', 5)),
+    'TOTAL_MINUTES_FOR_100_PERCENT': int(os.environ.get('TOTAL_MINUTES_FOR_100_PERCENT', 300)),
+    'SCRAP_METAL_PER_MINUTE': int(os.environ.get('SCRAP_METAL_PER_MINUTE', 1)),
+    'GRACE_PERIOD': int(os.environ.get('GRACE_PERIOD', 10)),
+    'ADMIN_USERNAME': os.environ.get('ADMIN_USERNAME', 'admin'),
+    'ADMIN_PASSWORD': os.environ.get('ADMIN_PASSWORD', 'garage123'),
+}
+```
+
+---
+
+## Updated Tech Stack
+
+### Backend Technologies
+- **Python Flask**: Web framework
+- **Flask-PyMongo**: MongoDB integration
+- **Werkzeug**: Password hashing and file handling
+- **Python-dotenv**: Environment variable management
+- **UUID**: Unique filename generation
+
+### Frontend Technologies
+- **Three.js r128**: 3D graphics rendering
+- **OrbitControls**: Camera interaction
+- **GLTFLoader**: 3D model loading
+- **HTML5 File API**: File upload handling
+- **Page Visibility API**: Tab detection
+- **Tailwind CSS**: Styling framework
+
+### Database & Storage
+- **MongoDB**: Document database for app data
+- **File System**: Asset storage for uploaded files
+- **Session Storage**: Flask sessions for authentication
+
+---
+
+## Complete API Reference
+
+### User API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/` | Main garage view |
+| GET/POST | `/login` | User authentication |
+| GET/POST | `/register` | User registration |
+| GET | `/logout` | User logout |
+| GET | `/junkyard` | Car selection page |
+| POST | `/api/select_car` | Choose car from junkyard |
+| POST | `/api/start_session` | Begin focus session |
+| POST | `/api/complete_session` | End focus session |
+| POST | `/api/heartbeat` | Session keep-alive |
+
+### 3D System API
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/api/car_3d/<model_id>` | Get 3D model data for car stage |
+
+### Admin API Endpoints
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET/POST | `/admin/login` | Admin authentication |
+| GET | `/admin/logout` | Admin logout |
+| GET | `/admin` | Admin dashboard |
+| GET | `/admin/cars` | Car template management |
+| GET/POST | `/admin/cars/new` | Create new car template |
+| GET | `/admin/cars/<id>/edit` | Edit car template |
+| POST | `/admin/cars/<id>/delete` | Delete car template |
+| GET/POST | `/admin/upload` | Asset upload interface |
+| POST | `/api/admin/update_car_stage` | Update car stage assets |
+
+---
+
+## System Initialization
+
+### Default Data Creation
+On first run, the system automatically creates:
+
+#### Default Car Templates
+```python
+templates = [
+    {
+        "model_id": "mustang_1969",
+        "name": "The Stallion",
+        "total_focus_minutes_required": 300,
+        "stages": [...] # 5 stages with empty asset URLs
+    },
+    {
+        "model_id": "corvette_1965", 
+        "name": "The Stingray",
+        "total_focus_minutes_required": 400,
+        "stages": [...] # 5 stages with empty asset URLs
+    }
+]
+```
+
+#### Directory Structure Creation
+```python
+# Ensure upload directories exist
+os.makedirs('static/assets/uploads/2d', exist_ok=True)
+os.makedirs('static/assets/uploads/3d', exist_ok=True)
+```
+
+---
+
+## Error Handling & Debugging
+
+### 3D System Error Handling
+- **Timeout mechanism**: 3-second timeout for 3D loading
+- **Graceful degradation**: Automatic fallback to 2D mode
+- **Resource cleanup**: Proper Three.js memory management
+- **Cross-browser compatibility**: WebGL support detection
+
+### Admin System Error Handling
+- **File validation**: Server-side file type and size checks
+- **Permission checks**: Admin authentication on all admin routes
+- **Database error handling**: Proper error messages for database operations
+- **Upload error handling**: File system error catching and reporting
+
+### Debug Logging
+```python
+# Enable debug mode for development
+if APP_CONFIG['FLASK_DEBUG']:
+    app.logger.setLevel(logging.DEBUG)
+    app.logger.debug('Debug mode enabled')
+```
+
+---
+
+This technical documentation now provides complete coverage of the enhanced Garage Focus application, including all 3D features, admin dashboard functionality, and asset management systems.
