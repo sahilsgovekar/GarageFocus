@@ -48,7 +48,7 @@
         <p class="text-gray-400">{{ current_car.car_model.replace('_', ' ').title() }}</p>
     </div>
 
-    <!-- Car Visual -->
+    <!-- Car Visual with 3D Viewer -->
     <div class="car-container mb-6">
         <!-- Car stages based on progress -->
         {% set progress = current_car.restoration_progress %}
@@ -60,36 +60,28 @@
         {% endfor %}
         
         <div class="relative bg-garage-dark border-2 border-gray-600 rounded-xl p-6">
-            <!-- Car Image Placeholder with Progress -->
-            <div class="w-full h-48 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden">
-                <!-- Background texture -->
-                <div class="absolute inset-0 opacity-20">
-                    <div class="w-full h-full" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><defs><pattern id=%22grain%22 width=%2250%22 height=%2250%22 patternUnits=%22userSpaceOnUse%22><circle cx=%2225%22 cy=%2225%22 r=%221%22 fill=%22%23333%22/></pattern></defs><rect width=%22100%22 height=%22100%22 fill=%22url(%23grain)%22/></svg>'); background-size: 20px 20px;"></div>
+            <!-- 3D Car Viewer Container -->
+            <div id="car-3d-viewer" class="w-full h-64 rounded-lg relative overflow-hidden">
+                <!-- Loading state -->
+                <div class="absolute inset-0 flex items-center justify-center bg-garage-darker">
+                    <div class="text-center">
+                        <div class="text-4xl mb-2">⚙️</div>
+                        <div class="text-neon-cyan">Initializing 3D Viewer...</div>
+                    </div>
                 </div>
-                
-                <!-- Car representation -->
-                <div class="relative z-10">
-                    {% if progress == 0 %}
-                        <!-- Rusted junk -->
-                        <div class="text-6xl filter grayscale">🚗💨</div>
-                        <div class="smoke-effect active"></div>
-                    {% elif progress < 25 %}
-                        <!-- Getting started -->
-                        <div class="text-6xl">🔧🚗</div>
-                    {% elif progress < 50 %}
-                        <!-- Half restored -->
-                        <div class="text-6xl">🚙</div>
-                    {% elif progress < 75 %}
-                        <!-- Almost done -->
-                        <div class="text-6xl">🚗✨</div>
-                    {% elif progress < 100 %}
-                        <!-- Nearly complete -->
-                        <div class="text-6xl">✨🚗✨</div>
-                    {% else %}
-                        <!-- Showroom ready -->
-                        <div class="text-6xl neon-pulse">🏁🚗🏁</div>
-                    {% endif %}
-                </div>
+            </div>
+            
+            <!-- 3D Controls -->
+            <div class="mt-4 flex justify-center space-x-4">
+                <button id="toggle-rotation" class="bg-garage-darker border border-gray-600 rounded-lg px-3 py-2 text-sm hover:border-neon-cyan transition-colors">
+                    🔄 Auto Rotate
+                </button>
+                <button id="reset-view" class="bg-garage-darker border border-gray-600 rounded-lg px-3 py-2 text-sm hover:border-neon-cyan transition-colors">
+                    🎯 Reset View
+                </button>
+                <button id="toggle-view" class="bg-garage-darker border border-gray-600 rounded-lg px-3 py-2 text-sm hover:border-neon-cyan transition-colors">
+                    📷 2D/3D View
+                </button>
             </div>
             
             <!-- Progress Bar -->
@@ -194,8 +186,18 @@
 </button>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<!-- Three.js for 3D car viewer -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/GLTFLoader.js"></script>
+<script src="/static/js/car-viewer-3d.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Focus session handling
     const startBtn = document.getElementById('start-focus-btn');
     const sessionForm = document.getElementById('session-form');
     const taskInput = document.getElementById('task-input');
@@ -207,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const duration = parseInt(durationSelect.value);
             
             if (!task) {
-                alert('Please enter what you\'re working on!');
+                alert('Please enter what you are working on!');
                 taskInput.focus();
                 return;
             }
@@ -224,7 +226,115 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Initialize 3D car viewer for current car
+    const carViewerContainer = document.getElementById('car-3d-viewer');
+    if (carViewerContainer) {
+        let carViewer = null;
+        
+        // Get car data from DOM attributes
+        const carData = {
+            {% if current_car %}
+            progress: {{ current_car.restoration_progress|round(2) }},
+            modelId: {{ current_car.car_model|tojson }},
+            hasCurrentCar: true
+            {% else %}
+            hasCurrentCar: false
+            {% endif %}
+        };
+        
+        if (carData.hasCurrentCar) {
+            // Initialize viewer with fallback
+            function initCarViewer() {
+                try {
+                    carViewer = new Car3DViewer('car-3d-viewer', {
+                        enableControls: true,
+                        autoRotate: false,
+                        height: 256
+                    });
+                    
+                    // Load model data
+                    fetch('/api/car_3d/' + carData.modelId + '?progress=' + carData.progress)
+                        .then(function(response) {
+                            return response.json();
+                        })
+                        .then(function(data) {
+                            if (data.model_3d_url && data.model_3d_url.length > 0) {
+                                carViewer.loadCarModel(data.model_3d_url, carData.progress);
+                            } else {
+                                carViewer.updateProgress(carData.progress);
+                            }
+                        })
+                        .catch(function(error) {
+                            console.warn('Failed to load 3D model:', error);
+                            carViewer.updateProgress(carData.progress);
+                        });
+                        
+                } catch (error) {
+                    console.warn('3D viewer initialization failed:', error);
+                    // Show fallback view
+                    document.getElementById('car-3d-viewer').innerHTML = 
+                        '<div class="fallback-viewer w-full h-full flex items-center justify-center bg-garage-dark rounded-lg">' +
+                        '<div class="text-center">' +
+                        '<div class="text-6xl mb-4">🚗</div>' +
+                        '<p class="text-gray-400">3D viewer not available</p>' +
+                        '</div></div>';
+                }
+            }
+
+            // Setup control handlers
+            function setupControls() {
+                const toggleRotation = document.getElementById('toggle-rotation');
+                const resetView = document.getElementById('reset-view');
+                const toggleView = document.getElementById('toggle-view');
+
+                if (toggleRotation) {
+                    toggleRotation.addEventListener('click', function() {
+                        if (carViewer && carViewer.controls) {
+                            carViewer.controls.autoRotate = !carViewer.controls.autoRotate;
+                            this.style.borderColor = carViewer.controls.autoRotate ? '#00d9ff' : '#4b5563';
+                        }
+                    });
+                }
+
+                if (resetView) {
+                    resetView.addEventListener('click', function() {
+                        if (carViewer && carViewer.controls) {
+                            carViewer.controls.reset();
+                        }
+                    });
+                }
+
+                if (toggleView) {
+                    toggleView.addEventListener('click', function() {
+                        if (carViewer) {
+                            carViewer.enableFallback();
+                            carViewer.updateProgress(carData.progress);
+                        }
+                    });
+                }
+            }
+
+            // Initialize everything
+            setTimeout(function() {
+                initCarViewer();
+                setTimeout(setupControls, 500);
+            }, 100);
+        }
+    }
+
+    // Handle session completion
+    if (window.focusTimer && window.focusTimer.stopSession) {
+        const originalStop = window.focusTimer.stopSession;
+        window.focusTimer.stopSession = function(success) {
+            originalStop.call(this, success);
+            if (success) {
+                setTimeout(function() {
+                    window.location.reload();
+                }, 2000);
+            }
+        };
+    }
 });
 </script>
-
 {% endblock %}

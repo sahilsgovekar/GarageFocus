@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Car - Admin - Garage Focus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'garage-dark': '#1a1a1a',
+                        'garage-darker': '#0d1117',
+                        'neon-cyan': '#00d9ff',
+                        'neon-amber': '#ffb000',
+                        'rust-red': '#b7410e',
+                        'engine-silver': '#c0c0c0'
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(135deg, #0d1117 0%, #1a1a1a 100%);
+        }
+    </style>
+</head>
+<body class="bg-garage-darker text-white min-h-screen">
+    <!-- Admin Navigation -->
+    <nav class="bg-garage-dark border-b border-neon-cyan/30 px-4 py-3">
+        <div class="flex justify-between items-center max-w-7xl mx-auto">
+            <h1 class="text-xl font-bold text-neon-cyan">➕ ADD NEW CAR</h1>
+            <div class="flex items-center space-x-4">
+                <a href="/admin/cars" class="text-neon-amber hover:text-amber-300">← Back to Cars</a>
+                <span class="text-gray-400">{{ session.admin_user }}</span>
+                <a href="/admin/logout" class="text-rust-red hover:text-red-400">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto px-4 py-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-3 rounded {% if category == 'error' %}bg-rust-red/20 border border-rust-red text-rust-red{% else %}bg-neon-amber/20 border border-neon-amber text-neon-amber{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Car Creation Form -->
+        <div class="bg-garage-dark border border-neon-cyan/30 rounded-lg p-8">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-4">🚗</div>
+                <h2 class="text-2xl font-bold text-neon-cyan mb-2">Create New Car Template</h2>
+                <p class="text-gray-400">Define the basic properties for your new car model</p>
+            </div>
+
+            <form method="POST" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Model ID -->
+                    <div>
+                        <label for="model_id" class="block text-sm font-medium text-gray-300 mb-2">
+                            Model ID <span class="text-rust-red">*</span>
+                        </label>
+                        <input type="text" id="model_id" name="model_id" required
+                               class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                                      focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 
+                                      text-white placeholder-gray-400"
+                               placeholder="e.g., mustang_1969"
+                               pattern="[a-z0-9_]+"
+                               title="Only lowercase letters, numbers, and underscores allowed">
+                        <p class="text-xs text-gray-500 mt-1">
+                            Unique identifier (lowercase, numbers, underscores only)
+                        </p>
+                    </div>
+
+                    <!-- Display Name -->
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-300 mb-2">
+                            Display Name <span class="text-rust-red">*</span>
+                        </label>
+                        <input type="text" id="name" name="name" required
+                               class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                                      focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 
+                                      text-white placeholder-gray-400"
+                               placeholder="e.g., The Stallion">
+                        <p class="text-xs text-gray-500 mt-1">
+                            User-friendly name displayed in the app
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Focus Time Required -->
+                <div>
+                    <label for="total_minutes" class="block text-sm font-medium text-gray-300 mb-2">
+                        Total Focus Time Required (minutes) <span class="text-rust-red">*</span>
+                    </label>
+                    <input type="number" id="total_minutes" name="total_minutes" required
+                           min="60" max="1200" value="300"
+                           class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                                  focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 
+                                  text-white placeholder-gray-400">
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>Time needed to fully restore this car (60-1200 minutes)</span>
+                        <span id="hours-display">5.0 hours</span>
+                    </div>
+                </div>
+
+                <!-- Progress Stages Info -->
+                <div class="bg-neon-amber/10 border border-neon-amber/30 rounded-lg p-4">
+                    <h3 class="font-bold text-neon-amber mb-3">📋 Restoration Stages</h3>
+                    <p class="text-sm text-gray-300 mb-3">
+                        Your car will automatically have 5 restoration stages. You can upload assets for each stage later:
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
+                        <div class="bg-garage-darker rounded p-3 text-center">
+                            <div class="text-rust-red font-semibold">0%</div>
+                            <div class="text-gray-400">Rusted Junk</div>
+                        </div>
+                        <div class="bg-garage-darker rounded p-3 text-center">
+                            <div class="text-orange-400 font-semibold">25%</div>
+                            <div class="text-gray-400">Getting Started</div>
+                        </div>
+                        <div class="bg-garage-darker rounded p-3 text-center">
+                            <div class="text-yellow-400 font-semibold">50%</div>
+                            <div class="text-gray-400">Half Restored</div>
+                        </div>
+                        <div class="bg-garage-darker rounded p-3 text-center">
+                            <div class="text-blue-400 font-semibold">75%</div>
+                            <div class="text-gray-400">Almost Done</div>
+                        </div>
+                        <div class="bg-garage-darker rounded p-3 text-center">
+                            <div class="text-green-400 font-semibold">100%</div>
+                            <div class="text-gray-400">Showroom Ready</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex space-x-4">
+                    <a href="/admin/cars" 
+                       class="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg text-center">
+                        Cancel
+                    </a>
+                    <button type="submit" 
+                            class="flex-1 bg-neon-cyan hover:bg-cyan-400 text-garage-darker font-bold py-3 px-4 rounded-lg">
+                        🔧 Create Car Template
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quick Tips -->
+        <div class="mt-8 bg-garage-dark border border-gray-600 rounded-lg p-6">
+            <h3 class="font-bold text-neon-cyan mb-4">💡 Quick Tips</h3>
+            <ul class="text-sm text-gray-300 space-y-2">
+                <li><strong>Model ID:</strong> Keep it simple and memorable (e.g., "ferrari_f40", "tesla_model_s")</li>
+                <li><strong>Focus Time:</strong> Consider your users' attention spans. 300 minutes (5 hours) is a good default</li>
+                <li><strong>Assets:</strong> After creating the template, you can upload 2D images and 3D models for each stage</li>
+                <li><strong>Testing:</strong> Create a test account to see how your car looks to users</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Update hours display when minutes input changes
+        document.getElementById('total_minutes').addEventListener('input', function() {
+            const minutes = parseInt(this.value) || 0;
+            const hours = (minutes / 60).toFixed(1);
+            document.getElementById('hours-display').textContent = hours + ' hours';
+        });
+
+        // Auto-generate model_id from name
+        document.getElementById('name').addEventListener('input', function() {
+            const name = this.value.toLowerCase();
+            const modelId = name
+                .replace(/[^a-z0-9\s]/g, '') // Remove special chars
+                .replace(/\s+/g, '_')         // Replace spaces with underscores
+                .replace(/_+/g, '_')          // Remove multiple underscores
+                .replace(/^_|_$/g, '');       // Remove leading/trailing underscores
+            
+            document.getElementById('model_id').value = modelId;
+        });
+
+        // Validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const modelId = document.getElementById('model_id').value;
+            const name = document.getElementById('name').value;
+            const minutes = parseInt(document.getElementById('total_minutes').value);
+
+            if (!modelId.match(/^[a-z0-9_]+$/)) {
+                e.preventDefault();
+                alert('Model ID can only contain lowercase letters, numbers, and underscores.');
+                return;
+            }
+
+            if (name.length < 3) {
+                e.preventDefault();
+                alert('Display name must be at least 3 characters long.');
+                return;
+            }
+
+            if (minutes < 60 || minutes > 1200) {
+                e.preventDefault();
+                alert('Focus time must be between 60 and 1200 minutes.');
+                return;
+            }
+        });
+    </script>
+</body>
+</html>

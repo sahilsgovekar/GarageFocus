@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Upload - Admin - Garage Focus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'garage-dark': '#1a1a1a',
+                        'garage-darker': '#0d1117',
+                        'neon-cyan': '#00d9ff',
+                        'neon-amber': '#ffb000',
+                        'rust-red': '#b7410e',
+                        'engine-silver': '#c0c0c0'
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(135deg, #0d1117 0%, #1a1a1a 100%);
+        }
+    </style>
+</head>
+<body class="bg-garage-darker text-white min-h-screen">
+    <!-- Admin Navigation -->
+    <nav class="bg-garage-dark border-b border-neon-cyan/30 px-4 py-3">
+        <div class="flex justify-between items-center max-w-7xl mx-auto">
+            <h1 class="text-xl font-bold text-neon-cyan">📁 ASSET UPLOAD</h1>
+            <div class="flex items-center space-x-4">
+                <a href="/admin" class="text-neon-amber hover:text-amber-300">← Dashboard</a>
+                <span class="text-gray-400">{{ session.admin_user }}</span>
+                <a href="/admin/logout" class="text-rust-red hover:text-red-400">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-3 rounded {% if category == 'error' %}bg-rust-red/20 border border-rust-red text-rust-red{% else %}bg-neon-amber/20 border border-neon-amber text-neon-amber{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Upload Form -->
+            <div>
+                <h2 class="text-2xl font-bold text-neon-cyan mb-6">Upload New Asset</h2>
+                <div class="bg-garage-dark border border-neon-cyan/30 rounded-lg p-6">
+                    <form method="POST" enctype="multipart/form-data" class="space-y-6">
+                        <div>
+                            <label for="file" class="block text-sm font-medium text-gray-300 mb-2">
+                                Select File
+                            </label>
+                            <input type="file" id="file" name="file" required
+                                   accept=".png,.jpg,.jpeg,.gif,.glb,.gltf,.fbx,.obj"
+                                   class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                                          focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 
+                                          text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg
+                                          file:border-0 file:bg-neon-cyan file:text-garage-darker
+                                          file:font-semibold hover:file:bg-cyan-400">
+                            <p class="text-xs text-gray-500 mt-2">
+                                Supported: PNG, JPG, GIF (2D) | GLB, GLTF, FBX, OBJ (3D) | Max 16MB
+                            </p>
+                        </div>
+
+                        <div>
+                            <label for="asset_type" class="block text-sm font-medium text-gray-300 mb-2">
+                                Asset Type
+                            </label>
+                            <select id="asset_type" name="asset_type" 
+                                    class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                                           focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 text-white">
+                                <option value="2d">2D Image (PNG, JPG, GIF)</option>
+                                <option value="3d">3D Model (GLB, GLTF, FBX, OBJ)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="car_id" class="block text-sm font-medium text-gray-300 mb-2">
+                                Assign to Car (Optional)
+                            </label>
+                            <select id="car_id" name="car_id" 
+                                    class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                                           focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 text-white">
+                                <option value="">Select a car template...</option>
+                                {% for car in car_templates %}
+                                    <option value="{{ car._id }}">{{ car.name }} ({{ car.model_id }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div id="stage-selector" class="hidden">
+                            <label for="stage_threshold" class="block text-sm font-medium text-gray-300 mb-2">
+                                Car Stage
+                            </label>
+                            <select id="stage_threshold" name="stage_threshold" 
+                                    class="w-full px-4 py-3 bg-garage-darker border border-gray-600 rounded-lg 
+                                           focus:border-neon-cyan focus:ring-2 focus:ring-neon-cyan/20 text-white">
+                                <option value="0">0% - Rusted Junk</option>
+                                <option value="25">25% - Getting Started</option>
+                                <option value="50">50% - Half Restored</option>
+                                <option value="75">75% - Almost Done</option>
+                                <option value="100">100% - Showroom Ready</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" 
+                                class="w-full bg-neon-cyan hover:bg-cyan-400 text-garage-darker 
+                                       font-bold py-3 px-4 rounded-lg transition-colors">
+                            📁 UPLOAD ASSET
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Upload Guidelines -->
+                <div class="mt-8 bg-neon-amber/10 border border-neon-amber/30 rounded-lg p-4">
+                    <h3 class="font-bold text-neon-amber mb-2">📋 Upload Guidelines</h3>
+                    <ul class="text-sm text-gray-300 space-y-1">
+                        <li><strong>2D Images:</strong> PNG/JPG for car progression stages</li>
+                        <li><strong>3D Models:</strong> GLB format recommended for web</li>
+                        <li><strong>File Size:</strong> Maximum 16MB per file</li>
+                        <li><strong>Naming:</strong> Files get unique IDs automatically</li>
+                        <li><strong>Stages:</strong> Upload assets for each restoration stage</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Uploaded Files -->
+            <div>
+                <h2 class="text-2xl font-bold text-neon-cyan mb-6">Uploaded Assets</h2>
+                <div class="space-y-4 max-h-96 overflow-y-auto">
+                    {% if uploaded_files %}
+                        {% for file in uploaded_files %}
+                        <div class="bg-garage-dark border border-gray-600 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <p class="font-semibold text-white truncate">{{ file.filename }}</p>
+                                    <p class="text-sm text-gray-400">
+                                        Type: {{ file.type.upper() }} | 
+                                        Size: {{ "%.1f"|format(file.size / 1024) }}KB
+                                    </p>
+                                </div>
+                                <div class="flex items-center space-x-2 ml-4">
+                                    {% if file.type == '2d' %}
+                                        <img src="{{ file.url }}" alt="Preview" class="w-12 h-12 object-cover rounded border border-gray-600">
+                                    {% else %}
+                                        <div class="w-12 h-12 bg-neon-cyan/20 rounded border border-neon-cyan flex items-center justify-center">
+                                            <span class="text-xs text-neon-cyan">3D</span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <a href="{{ file.url }}" target="_blank" class="text-neon-amber hover:text-amber-300 text-sm">
+                                    View Asset →
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="bg-garage-dark border border-gray-600 rounded-lg p-8 text-center text-gray-500">
+                            No assets uploaded yet
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Show/hide stage selector based on car selection
+        document.getElementById('car_id').addEventListener('change', function() {
+            const stageSelector = document.getElementById('stage-selector');
+            if (this.value) {
+                stageSelector.classList.remove('hidden');
+            } else {
+                stageSelector.classList.add('hidden');
+            }
+        });
+
+        // File type validation
+        document.getElementById('file').addEventListener('change', function() {
+            const file = this.files[0];
+            const assetType = document.getElementById('asset_type');
+            
+            if (file) {
+                const ext = file.name.split('.').pop().toLowerCase();
+                const imageExts = ['png', 'jpg', 'jpeg', 'gif'];
+                const modelExts = ['glb', 'gltf', 'fbx', 'obj'];
+                
+                if (imageExts.includes(ext)) {
+                    assetType.value = '2d';
+                } else if (modelExts.includes(ext)) {
+                    assetType.value = '3d';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

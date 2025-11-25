@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Cars - Admin - Garage Focus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'garage-dark': '#1a1a1a',
+                        'garage-darker': '#0d1117',
+                        'neon-cyan': '#00d9ff',
+                        'neon-amber': '#ffb000',
+                        'rust-red': '#b7410e',
+                        'engine-silver': '#c0c0c0'
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Orbitron', monospace;
+            background: linear-gradient(135deg, #0d1117 0%, #1a1a1a 100%);
+        }
+    </style>
+</head>
+<body class="bg-garage-darker text-white min-h-screen">
+    <!-- Admin Navigation -->
+    <nav class="bg-garage-dark border-b border-neon-cyan/30 px-4 py-3">
+        <div class="flex justify-between items-center max-w-7xl mx-auto">
+            <h1 class="text-xl font-bold text-neon-cyan">🚗 MANAGE CARS</h1>
+            <div class="flex items-center space-x-4">
+                <a href="/admin" class="text-neon-amber hover:text-amber-300">← Dashboard</a>
+                <span class="text-gray-400">{{ session.admin_user }}</span>
+                <a href="/admin/logout" class="text-rust-red hover:text-red-400">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-4 p-3 rounded {% if category == 'error' %}bg-rust-red/20 border border-rust-red text-rust-red{% else %}bg-neon-amber/20 border border-neon-amber text-neon-amber{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Add New Car Button -->
+        <div class="mb-6">
+            <a href="/admin/cars/new" class="bg-neon-cyan hover:bg-cyan-400 text-garage-darker font-bold py-3 px-6 rounded-lg inline-block">
+                ➕ Add New Car Template
+            </a>
+        </div>
+
+        <!-- Car Templates List -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for car in car_templates %}
+            <div class="bg-garage-dark border border-gray-600 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-neon-cyan">{{ car.name }}</h3>
+                    <span class="text-sm text-gray-400">{{ car.model_id }}</span>
+                </div>
+
+                <!-- Car Preview -->
+                <div class="mb-4">
+                    <div class="w-full h-32 bg-garage-darker rounded-lg flex items-center justify-center border border-gray-700">
+                        {% set first_stage = car.stages[0] if car.stages else {} %}
+                        {% if first_stage.get('image_url') %}
+                            <img src="{{ first_stage.image_url }}" alt="{{ car.name }}" class="w-full h-full object-contain rounded">
+                        {% else %}
+                            <div class="text-4xl">🚗</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Car Details -->
+                <div class="space-y-2 text-sm mb-4">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Focus Time Required:</span>
+                        <span class="text-neon-amber">{{ (car.total_focus_minutes_required / 60)|round(1) }}h</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Stages:</span>
+                        <span class="text-engine-silver">{{ car.stages|length }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Created:</span>
+                        <span class="text-gray-300">{{ car.created_at.strftime('%Y-%m-%d') if car.created_at else 'N/A' }}</span>
+                    </div>
+                </div>
+
+                <!-- Asset Status -->
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold text-gray-300 mb-2">Asset Status:</h4>
+                    <div class="grid grid-cols-5 gap-1">
+                        {% for stage in car.stages %}
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500">{{ stage.threshold }}%</div>
+                            <div class="w-8 h-8 rounded border border-gray-600 flex items-center justify-center text-xs">
+                                {% if stage.get('image_url') %}
+                                    <span class="text-green-400">🖼️</span>
+                                {% endif %}
+                                {% if stage.get('model_3d_url') %}
+                                    <span class="text-neon-cyan">📦</span>
+                                {% endif %}
+                                {% if not stage.get('image_url') and not stage.get('model_3d_url') %}
+                                    <span class="text-gray-600">❌</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        🖼️ = 2D Image | 📦 = 3D Model | ❌ = Missing
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex space-x-2">
+                    <a href="/admin/cars/{{ car._id }}/edit" 
+                       class="flex-1 bg-neon-amber hover:bg-amber-400 text-garage-darker font-semibold py-2 px-4 rounded text-center">
+                        ✏️ Edit
+                    </a>
+                    <button onclick="confirmDelete('{{ car._id }}', '{{ car.name }}')" 
+                            class="bg-rust-red hover:bg-red-700 text-white font-semibold py-2 px-4 rounded">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if not car_templates %}
+            <div class="col-span-full text-center py-12">
+                <div class="text-4xl mb-4">🚗</div>
+                <h3 class="text-xl font-bold text-gray-400 mb-2">No Car Templates Yet</h3>
+                <p class="text-gray-500 mb-4">Create your first car template to get started!</p>
+                <a href="/admin/cars/new" class="bg-neon-cyan hover:bg-cyan-400 text-garage-darker font-bold py-2 px-6 rounded-lg">
+                    ➕ Add First Car
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="fixed inset-0 bg-garage-darker/90 flex items-center justify-center z-50 hidden">
+        <div class="bg-garage-dark border border-rust-red rounded-lg p-6 m-4 max-w-md w-full">
+            <div class="text-center">
+                <div class="text-4xl mb-4">⚠️</div>
+                <h3 class="text-xl font-bold text-rust-red mb-2">Delete Car Template</h3>
+                <p class="text-gray-400 mb-4">
+                    Are you sure you want to delete <span id="deleteName" class="text-neon-amber font-semibold"></span>?
+                    This action cannot be undone.
+                </p>
+                <div class="flex space-x-3">
+                    <button onclick="closeDeleteModal()" class="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded">
+                        Cancel
+                    </button>
+                    <form id="deleteForm" method="POST" class="flex-1">
+                        <button type="submit" class="w-full bg-rust-red hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function confirmDelete(carId, carName) {
+            document.getElementById('deleteName').textContent = carName;
+            document.getElementById('deleteForm').action = `/admin/cars/${carId}/delete`;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
+
+        // Close modal on outside click
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteModal();
+            }
+        });
+    </script>
+</body>
+</html>
