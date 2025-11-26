@@ -144,7 +144,8 @@
     <!-- Focus Timer Overlay -->
     <div id="focus-overlay" class="fixed inset-0 bg-garage-darker/95 flex flex-col items-center justify-center z-50 hidden">
         <div class="text-center p-8">
-            <h2 class="text-3xl font-bold text-neon-cyan mb-4 font-racing">FOCUS MODE</h2>
+            <h2 class="text-3xl font-bold text-neon-cyan mb-2 font-racing">TIMER ACTIVE</h2>
+            <p id="mode-indicator" class="text-neon-amber font-bold mb-4">🔒 FOCUS MODE</p>
             <div class="relative w-40 h-40 mx-auto mb-6">
                 <svg class="w-full h-full progress-ring">
                     <circle cx="80" cy="80" r="70" stroke="#333" stroke-width="8" fill="transparent"/>
@@ -159,6 +160,9 @@
             <div id="tab-warning" class="hidden bg-rust-red/20 border border-rust-red text-rust-red px-4 py-3 rounded mb-4">
                 ⚠️ Hey! Get back to the garage! Engine will stall in <span id="warning-countdown">10</span> seconds!
             </div>
+            <div id="background-info" class="hidden bg-neon-cyan/20 border border-neon-cyan text-neon-cyan px-4 py-3 rounded mb-4">
+                📱 You can switch tabs freely! Timer runs in background.
+            </div>
             <button id="stop-session" class="bg-rust-red hover:bg-red-700 px-6 py-3 rounded font-bold">
                 Stop Session
             </button>
@@ -167,24 +171,44 @@
 
     <!-- Focus Timer JavaScript -->
     <script>
-        class FocusTimer {
+        class EnhancedFocusTimer {
             constructor() {
                 this.isActive = false;
                 this.startTime = null;
                 this.duration = 0; // in minutes
+                this.currentTask = '';
+                this.sessionId = null;
+                this.mode = 'focus'; // 'focus' or 'background'
+                
+                // Legacy focus mode properties
                 this.warningTimeout = null;
-                this.failTimeout = null;
-                this.heartbeatInterval = null;
-                this.timerInterval = null;
                 this.tabSwitchTime = null;
                 
+                // Web Worker for background timer
+                this.worker = null;
+                this.initWorker();
                 this.initEventListeners();
             }
             
+            initWorker() {
+                try {
+                    this.worker = new Worker('/static/js/timer-worker.js');
+                    this.worker.onmessage = (e) => this.handleWorkerMessage(e);
+                    this.worker.onerror = (error) => {
+                        console.error('Timer worker error:', error);
+                        // Fallback to legacy mode
+                        this.mode = 'focus';
+                    };
+                } catch (error) {
+                    console.warn('Web Worker not supported, using legacy timer');
+                    this.worker = null;
+                }
+            }
+            
             initEventListeners() {
-                // Page visibility API
+                // Page visibility API (only for focus mode)
                 document.addEventListener("visibilitychange", () => {
-                    if (this.isActive) {
+                    if (this.isActive && this.mode === 'focus') {
                         if (document.visibilityState === 'hidden') {
                             this.handleTabSwitch();
                         } else if (document.visibilityState === 'visible') {
@@ -199,21 +223,76 @@
                 });
             }
             
-            startSession(taskName, durationMinutes) {
+            handleWorkerMessage(e) {
+                const { type, data } = e.data;
+                
+                switch (type) {
+                    case 'TIMER_UPDATE':
+                        this.updateTimerDisplay(data);
+                        break;
+                    case 'TIMER_COMPLETED':
+                        this.stopSession(true);
+                        break;
+                    case 'TIMER_STOPPED':
+                        // Worker confirmed stop
+                        break;
+                    case 'HEARTBEAT':
+                        this.sendHeartbeat(data.elapsedMinutes);
+                        break;
+                    case 'WORKER_ERROR':
+                        console.error('Timer worker error:', data.message);
+                        break;
+                }
+            }
+            
+            startSession(taskName, durationMinutes, timerMode = 'focus') {
                 this.isActive = true;
                 this.startTime = new Date();
                 this.duration = durationMinutes;
+                this.currentTask = taskName;
+                this.mode = timerMode;
+                this.sessionId = Date.now().toString();
                 
                 // Show overlay
                 document.getElementById('focus-overlay').classList.remove('hidden');
                 document.getElementById('session-task').textContent = `Working on: ${taskName}`;
                 
-                // Start timer display
-                this.updateTimerDisplay();
-                this.timerInterval = setInterval(() => this.updateTimerDisplay(), 1000);
+                // Update mode indicator and info displays
+                const modeIndicator = document.getElementById('mode-indicator');
+                const backgroundInfo = document.getElementById('background-info');
+                const tabWarning = document.getElementById('tab-warning');
                 
-                // Start heartbeat
-                this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 60000); // Every minute
+                if (modeIndicator) {
+                    modeIndicator.textContent = timerMode === 'background' ? '📱 BACKGROUND MODE' : '🔒 FOCUS MODE';
+                    modeIndicator.className = timerMode === 'background' ? 
+                        'text-neon-cyan font-bold mb-4' : 'text-neon-amber font-bold mb-4';
+                }
+                
+                // Show/hide appropriate info based on mode
+                if (timerMode === 'background') {
+                    backgroundInfo.classList.remove('hidden');
+                    tabWarning.classList.add('hidden');
+                } else {
+                    backgroundInfo.classList.add('hidden');
+                    // tabWarning will be shown/hidden by visibility change handler
+                }
+                
+                // Start appropriate timer
+                if (this.worker && timerMode === 'background') {
+                    // Use Web Worker for background mode
+                    this.worker.postMessage({
+                        action: 'START_TIMER',
+                        data: {
+                            duration: durationMinutes,
+                            sessionId: this.sessionId,
+                            mode: timerMode
+                        }
+                    });
+                } else {
+                    // Use legacy timer for focus mode or fallback
+                    this.mode = 'focus';
+                    this.startLegacyTimer();
+                }
                 
                 // Send start session to backend
                 fetch('/api/start_session', {
@@ -221,18 +300,35 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         duration: durationMinutes, 
-                        task: taskName 
+                        task: taskName,
+                        mode: this.mode
                     })
                 });
             }
             
-            updateTimerDisplay() {
-                const elapsed = (new Date() - this.startTime) / 1000 / 60; // minutes
-                const remaining = Math.max(0, this.duration - elapsed);
+            startLegacyTimer() {
+                // Legacy implementation for focus mode
+                this.updateTimerDisplay();
+                this.timerInterval = setInterval(() => this.updateTimerDisplay(), 1000);
+                this.heartbeatInterval = setInterval(() => this.sendHeartbeat(), 60000);
+            }
+            
+            updateTimerDisplay(workerData = null) {
+                let elapsed, remaining;
                 
-                if (remaining <= 0) {
-                    this.stopSession(true);
-                    return;
+                if (workerData) {
+                    // Data from worker
+                    elapsed = workerData.elapsed;
+                    remaining = workerData.remaining;
+                } else {
+                    // Legacy calculation
+                    elapsed = (new Date() - this.startTime) / 1000 / 60; // minutes
+                    remaining = Math.max(0, this.duration - elapsed);
+                    
+                    if (remaining <= 0) {
+                        this.stopSession(true);
+                        return;
+                    }
                 }
                 
                 const minutes = Math.floor(remaining);
@@ -249,7 +345,7 @@
             }
             
             handleTabSwitch() {
-                if (!this.isActive) return;
+                if (!this.isActive || this.mode !== 'focus') return;
                 
                 this.tabSwitchTime = new Date();
                 document.getElementById('tab-warning').classList.remove('hidden');
@@ -266,7 +362,7 @@
             }
             
             handleTabReturn() {
-                if (!this.isActive || !this.tabSwitchTime) return;
+                if (!this.isActive || !this.tabSwitchTime || this.mode !== 'focus') return;
                 
                 const awayTime = (new Date() - this.tabSwitchTime) / 1000;
                 
@@ -294,13 +390,22 @@
                 if (!this.isActive) return;
                 
                 this.isActive = false;
-                const elapsedMinutes = (new Date() - this.startTime) / 1000 / 60;
+                let elapsedMinutes;
                 
-                // Clear intervals
-                if (this.timerInterval) clearInterval(this.timerInterval);
-                if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                if (this.worker && this.mode === 'background') {
+                    // Stop worker timer
+                    this.worker.postMessage({ action: 'STOP_TIMER' });
+                    // We'll get elapsed time from worker message, but calculate fallback
+                    elapsedMinutes = (new Date() - this.startTime) / 1000 / 60;
+                } else {
+                    // Legacy mode cleanup
+                    elapsedMinutes = (new Date() - this.startTime) / 1000 / 60;
+                    if (this.timerInterval) clearInterval(this.timerInterval);
+                    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+                }
+                
+                // Clear focus mode warnings
                 if (this.warningTimeout) clearInterval(this.warningTimeout);
-                if (this.failTimeout) clearTimeout(this.failTimeout);
                 
                 // Hide overlay
                 document.getElementById('focus-overlay').classList.add('hidden');
@@ -312,34 +417,49 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         minutes_focused: elapsedMinutes,
-                        success: success
+                        success: success,
+                        mode: this.mode
                     })
                 }).then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        alert(data.message);
-                        location.reload(); // Refresh to show updated car state
-                    } else {
-                        alert(data.message || 'Session completed');
-                        location.reload();
-                    }
+                    const message = success ? 
+                        (data.message || `Great work! Session completed in ${this.mode} mode.`) :
+                        (data.message || 'Session stopped.');
+                    
+                    alert(message);
+                    location.reload(); // Refresh to show updated car state
                 });
             }
             
-            sendHeartbeat() {
+            sendHeartbeat(elapsedMinutes = null) {
                 if (!this.isActive) return;
+                
+                const minutes = elapsedMinutes || (new Date() - this.startTime) / 1000 / 60;
                 
                 fetch('/api/heartbeat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        elapsed_minutes: minutes,
+                        mode: this.mode
+                    })
                 });
+            }
+            
+            // Backward compatibility
+            startFocusSession(taskName, durationMinutes) {
+                this.startSession(taskName, durationMinutes, 'focus');
+            }
+            
+            startBackgroundSession(taskName, durationMinutes) {
+                this.startSession(taskName, durationMinutes, 'background');
             }
         }
         
-        // Initialize timer
-        const focusTimer = new FocusTimer();
+        // Initialize enhanced timer
+        const focusTimer = new EnhancedFocusTimer();
         
-        // Make it globally available
+        // Make it globally available (backward compatibility)
         window.focusTimer = focusTimer;
     </script>
 

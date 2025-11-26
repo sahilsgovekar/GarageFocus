@@ -149,15 +149,33 @@
                     <option value="60">60 minutes - Marathon</option>
                 </select>
             </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">
+                    Timer Mode
+                </label>
+                <div class="space-y-2">
+                    <label class="flex items-center p-3 bg-garage-darker border border-gray-600 rounded-lg cursor-pointer hover:border-neon-amber transition-colors">
+                        <input type="radio" name="timer-mode" value="focus" id="focus-mode" checked 
+                               class="text-neon-amber focus:ring-neon-amber/20 bg-garage-darker border-gray-600">
+                        <div class="ml-3">
+                            <div class="text-neon-amber font-semibold">🔒 Focus Mode</div>
+                            <div class="text-xs text-gray-400">Stay on tab - leave = warning + failure</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-3 bg-garage-darker border border-gray-600 rounded-lg cursor-pointer hover:border-neon-cyan transition-colors">
+                        <input type="radio" name="timer-mode" value="background" id="background-mode"
+                               class="text-neon-cyan focus:ring-neon-cyan/20 bg-garage-darker border-gray-600">
+                        <div class="ml-3">
+                            <div class="text-neon-cyan font-semibold">📱 Background Mode</div>
+                            <div class="text-xs text-gray-400">Switch tabs freely - timer runs in background</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
             
-            <div class="bg-neon-amber/10 border border-neon-amber/30 rounded p-3 text-sm">
-                <p class="text-neon-amber font-semibold mb-1">⚠️ Focus Rules:</p>
-                <ul class="text-gray-300 text-xs space-y-1">
-                    <li>• Stay on this tab during the session</li>
-                    <li>• Switch tabs = 10 second warning</li>
-                    <li>• Don't return in time = session fails!</li>
-                    <li>• Complete session = earn scrap metal + progress</li>
-                </ul>
+            <div id="mode-info" class="rounded p-3 text-sm transition-all duration-300">
+                <!-- Dynamic mode information will be inserted here -->
             </div>
         </form>
     </div>
@@ -203,10 +221,52 @@ document.addEventListener('DOMContentLoaded', function() {
     const taskInput = document.getElementById('task-input');
     const durationSelect = document.getElementById('duration-select');
     
+    // Timer mode handling
+    const focusModeRadio = document.getElementById('focus-mode');
+    const backgroundModeRadio = document.getElementById('background-mode');
+    const modeInfoDiv = document.getElementById('mode-info');
+    
+    function updateModeInfo() {
+        const selectedMode = document.querySelector('input[name="timer-mode"]:checked').value;
+        
+        if (selectedMode === 'focus') {
+            modeInfoDiv.innerHTML = `
+                <div class="bg-neon-amber/10 border border-neon-amber/30">
+                    <p class="text-neon-amber font-semibold mb-1">🔒 Focus Rules:</p>
+                    <ul class="text-gray-300 text-xs space-y-1">
+                        <li>• Stay on this tab during the session</li>
+                        <li>• Switch tabs = 10 second warning</li>
+                        <li>• Don't return in time = session fails!</li>
+                        <li>• Complete session = earn scrap metal + progress</li>
+                    </ul>
+                </div>
+            `;
+        } else {
+            modeInfoDiv.innerHTML = `
+                <div class="bg-neon-cyan/10 border border-neon-cyan/30">
+                    <p class="text-neon-cyan font-semibold mb-1">📱 Background Rules:</p>
+                    <ul class="text-gray-300 text-xs space-y-1">
+                        <li>• Switch tabs freely - timer keeps running</li>
+                        <li>• Works across browser tabs and apps</li>
+                        <li>• No penalties for leaving the page</li>
+                        <li>• Complete session = earn scrap metal + progress</li>
+                    </ul>
+                </div>
+            `;
+        }
+    }
+    
+    if (focusModeRadio && backgroundModeRadio) {
+        focusModeRadio.addEventListener('change', updateModeInfo);
+        backgroundModeRadio.addEventListener('change', updateModeInfo);
+        updateModeInfo(); // Initial update
+    }
+
     if (startBtn && sessionForm) {
         startBtn.addEventListener('click', function() {
             const task = taskInput.value.trim();
             const duration = parseInt(durationSelect.value);
+            const selectedMode = document.querySelector('input[name="timer-mode"]:checked').value;
             
             if (!task) {
                 alert('Please enter what you are working on!');
@@ -214,8 +274,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Start focus session
-            window.focusTimer.startSession(task, duration);
+            // Start session with selected mode
+            window.focusTimer.startSession(task, duration, selectedMode);
         });
         
         // Allow Enter key to start session
