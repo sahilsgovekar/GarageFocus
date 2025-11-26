@@ -155,28 +155,41 @@
                     Timer Mode
                 </label>
                 <div class="space-y-2">
-                    <label class="flex items-center p-3 bg-garage-darker border border-gray-600 rounded-lg cursor-pointer hover:border-neon-amber transition-colors">
-                        <input type="radio" name="timer-mode" value="focus" id="focus-mode" checked 
-                               class="text-neon-amber focus:ring-neon-amber/20 bg-garage-darker border-gray-600">
-                        <div class="ml-3">
-                            <div class="text-neon-amber font-semibold">🔒 Focus Mode</div>
-                            <div class="text-xs text-gray-400">Stay on tab - leave = warning + failure</div>
+                    <label class="flex items-center justify-between p-3 bg-garage-darker border border-gray-600 rounded-lg cursor-pointer hover:border-neon-amber transition-colors">
+                        <div class="flex items-center">
+                            <input type="radio" name="timer-mode" value="focus" id="focus-mode" checked 
+                                   class="text-neon-amber focus:ring-neon-amber/20 bg-garage-darker border-gray-600">
+                            <div class="ml-3">
+                                <div class="text-neon-amber font-semibold">🔒 Focus Mode</div>
+                                <div class="text-xs text-gray-400">Stay on tab - leave = warning + failure</div>
+                            </div>
                         </div>
+                        <button type="button" 
+                                class="info-icon text-neon-amber hover:text-yellow-300 p-1 ml-2" 
+                                data-mode="focus"
+                                onclick="event.preventDefault(); toggleModeInfo(event, 'focus')">
+                            ℹ️
+                        </button>
                     </label>
-                    <label class="flex items-center p-3 bg-garage-darker border border-gray-600 rounded-lg cursor-pointer hover:border-neon-cyan transition-colors">
-                        <input type="radio" name="timer-mode" value="background" id="background-mode"
-                               class="text-neon-cyan focus:ring-neon-cyan/20 bg-garage-darker border-gray-600">
-                        <div class="ml-3">
-                            <div class="text-neon-cyan font-semibold">📱 Background Mode</div>
-                            <div class="text-xs text-gray-400">Switch tabs freely - timer runs in background</div>
+                    <label class="flex items-center justify-between p-3 bg-garage-darker border border-gray-600 rounded-lg cursor-pointer hover:border-neon-cyan transition-colors">
+                        <div class="flex items-center">
+                            <input type="radio" name="timer-mode" value="background" id="background-mode"
+                                   class="text-neon-cyan focus:ring-neon-cyan/20 bg-garage-darker border-gray-600">
+                            <div class="ml-3">
+                                <div class="text-neon-cyan font-semibold">📱 Background Mode</div>
+                                <div class="text-xs text-gray-400">Switch tabs freely - timer runs in background</div>
+                            </div>
                         </div>
+                        <button type="button" 
+                                class="info-icon text-neon-cyan hover:text-cyan-300 p-1 ml-2" 
+                                data-mode="background"
+                                onclick="event.preventDefault(); toggleModeInfo(event, 'background')">
+                            ℹ️
+                        </button>
                     </label>
                 </div>
             </div>
-            
-            <div id="mode-info" class="rounded p-3 text-sm transition-all duration-300">
-                <!-- Dynamic mode information will be inserted here -->
-            </div>
+
         </form>
     </div>
 
@@ -204,6 +217,16 @@
 </button>
 {% endif %}
 
+<!-- Info Popup Overlay -->
+<div id="info-popup" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+    <div class="bg-garage-darker border-2 border-gray-600 rounded-lg p-6 max-w-sm mx-4 relative">
+        <button id="close-popup" class="absolute top-2 right-2 text-gray-400 hover:text-white text-xl">&times;</button>
+        <div id="popup-content">
+            <!-- Dynamic content will be inserted here -->
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -221,46 +244,81 @@ document.addEventListener('DOMContentLoaded', function() {
     const taskInput = document.getElementById('task-input');
     const durationSelect = document.getElementById('duration-select');
     
-    // Timer mode handling
-    const focusModeRadio = document.getElementById('focus-mode');
-    const backgroundModeRadio = document.getElementById('background-mode');
-    const modeInfoDiv = document.getElementById('mode-info');
+    // Popup functionality
+    let popupTimeout = null;
     
-    function updateModeInfo() {
-        const selectedMode = document.querySelector('input[name="timer-mode"]:checked').value;
+    window.toggleModeInfo = function(event, mode) {
+        const popup = document.getElementById('info-popup');
+        const popupContent = document.getElementById('popup-content');
+        const closeBtn = document.getElementById('close-popup');
         
-        if (selectedMode === 'focus') {
-            modeInfoDiv.innerHTML = `
-                <div class="bg-neon-amber/10 border border-neon-amber/30">
-                    <p class="text-neon-amber font-semibold mb-1">🔒 Focus Rules:</p>
-                    <ul class="text-gray-300 text-xs space-y-1">
+        // Clear any existing timeout
+        if (popupTimeout) {
+            clearTimeout(popupTimeout);
+            popupTimeout = null;
+        }
+        
+        // Define content for each mode
+        const content = {
+            focus: `
+                <div class="text-center">
+                    <h3 class="text-xl font-bold text-neon-amber mb-3">🔒 Focus Mode Rules</h3>
+                    <ul class="text-gray-300 text-sm space-y-2 text-left">
                         <li>• Stay on this tab during the session</li>
                         <li>• Switch tabs = 10 second warning</li>
                         <li>• Don't return in time = session fails!</li>
                         <li>• Complete session = earn scrap metal + progress</li>
                     </ul>
+                    <p class="text-neon-amber text-xs mt-4">Perfect for deep focus work!</p>
                 </div>
-            `;
-        } else {
-            modeInfoDiv.innerHTML = `
-                <div class="bg-neon-cyan/10 border border-neon-cyan/30">
-                    <p class="text-neon-cyan font-semibold mb-1">📱 Background Rules:</p>
-                    <ul class="text-gray-300 text-xs space-y-1">
+            `,
+            background: `
+                <div class="text-center">
+                    <h3 class="text-xl font-bold text-neon-cyan mb-3">📱 Background Mode Rules</h3>
+                    <ul class="text-gray-300 text-sm space-y-2 text-left">
                         <li>• Switch tabs freely - timer keeps running</li>
                         <li>• Works across browser tabs and apps</li>
                         <li>• No penalties for leaving the page</li>
                         <li>• Complete session = earn scrap metal + progress</li>
                     </ul>
+                    <p class="text-neon-cyan text-xs mt-4">Great for flexible work sessions!</p>
                 </div>
-            `;
-        }
-    }
-    
-    if (focusModeRadio && backgroundModeRadio) {
-        focusModeRadio.addEventListener('change', updateModeInfo);
-        backgroundModeRadio.addEventListener('change', updateModeInfo);
-        updateModeInfo(); // Initial update
-    }
+            `
+        };
+        
+        // Set content and show popup
+        popupContent.innerHTML = content[mode] || '';
+        popup.classList.remove('hidden');
+        
+        // Auto-close after 15 seconds
+        popupTimeout = setTimeout(function() {
+            popup.classList.add('hidden');
+            popupTimeout = null;
+        }, 15000);
+        
+        // Close button handler
+        closeBtn.onclick = function() {
+            popup.classList.add('hidden');
+            if (popupTimeout) {
+                clearTimeout(popupTimeout);
+                popupTimeout = null;
+            }
+        };
+        
+        // Close on overlay click
+        popup.onclick = function(e) {
+            if (e.target === popup) {
+                popup.classList.add('hidden');
+                if (popupTimeout) {
+                    clearTimeout(popupTimeout);
+                    popupTimeout = null;
+                }
+            }
+        };
+        
+        // Stop the event from triggering the radio button
+        event.stopPropagation();
+    };
 
     if (startBtn && sessionForm) {
         startBtn.addEventListener('click', function() {
